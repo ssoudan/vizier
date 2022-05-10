@@ -1,24 +1,26 @@
 """RPC functions implemented from vizier_service.proto."""
-
 import collections
 import datetime
 import random
 import threading
 from typing import Optional
-
 from absl import logging
 import grpc
 import numpy as np
+import sqlalchemy as sqla
+
 from vizier import pythia
 from vizier import pyvizier as base_pyvizier
 from vizier._src.algorithms.designers import emukit
 from vizier._src.algorithms.evolution import nsga2
 from vizier._src.algorithms.policies import designer_policy as dp
 from vizier._src.algorithms.policies import random_policy
+
 from vizier.service import datastore
 from vizier.service import pyvizier
 from vizier.service import resources
 from vizier.service import service_policy_supporter
+from vizier.service import sql_datastore
 from vizier.service import study_pb2
 from vizier.service import vizier_oss_pb2
 from vizier.service import vizier_service_pb2
@@ -62,6 +64,7 @@ class VizierService(vizier_service_pb2_grpc.VizierServiceServicer):
 
   def __init__(
       self,
+      database_url: str = 'sqlite:///:memory:',
       early_stop_recycle_period: datetime.timedelta = datetime.timedelta(
           seconds=60)):
     """Initializes the service.
@@ -70,11 +73,14 @@ class VizierService(vizier_service_pb2_grpc.VizierServiceServicer):
     datastore input/output is assumed to always be pass-by-value.
 
     Args:
+      database_url: URL to the database. Can be local.
       early_stop_recycle_period: Amount of time needed to pass before recycling
         an early stopping operation. See `CheckEarlyStoppingState` for more
         details.
     """
-    self.datastore = datastore.NestedDictRAMDataStore()
+    engine = sqla.create_engine(
+        database_url, echo=True, connect_args={'check_same_thread': False})
+    self.datastore = sql_datastore.SQLDataStore(engine)
 
     # For database edits using owner names.
     self._owner_name_to_lock = collections.defaultdict(threading.Lock)
