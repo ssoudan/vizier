@@ -114,14 +114,14 @@ class StudyInterface(abc.ABC):
   def suggest(self,
               *,
               count: Optional[int] = None,
-              worker: str = '') -> Collection[TrialInterface]:
-    """Returns Trials to be evaluated by worker.
+              client_id: str = '') -> Collection[TrialInterface]:
+    """Returns Trials to be evaluated by client_id.
 
     Args:
       count: Number of suggestions.
-      worker: When new Trials are generated, their `assigned_worker` field is
-        populated with this worker. suggest() first looks for existing Trials
-        that are assigned to `worker`, before generating new ones.
+      client_id: When new Trials are generated, their `assigned_worker` field is
+        populated with this client_id. suggest() first looks for existing Trials
+        that are assigned to `client_id`, before generating new ones.
 
     Returns:
       Trials.
@@ -160,7 +160,8 @@ class StudyInterface(abc.ABC):
   def materialize_study_config(self) -> vz.StudyConfig:
     """#Materializes the study config."""
 
-  @abc.abstractclassmethod
+  @abc.abstractmethod
+  @classmethod
   def from_uid(cls: Type[_T], uid: str) -> _T:
     """Fetches an existing study from the Vizier service.
 

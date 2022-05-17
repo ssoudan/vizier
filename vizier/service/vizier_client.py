@@ -73,11 +73,16 @@ class VizierClient:
   def study_name(self) -> Text:
     return self._study_name
 
-  def get_suggestions(self, suggestion_count: int) -> List[pyvizier.Trial]:
+  def get_suggestions(
+      self,
+      suggestion_count: int,
+      *,
+      client_id_override: Optional[str] = None) -> List[pyvizier.Trial]:
     """Gets a list of suggested Trials.
 
     Args:
         suggestion_count: The number of suggestions to request.
+        client_id_override: If set, overrides self._client_id for this call.
 
     Returns:
       A list of PyVizier Trials. This may be an empty list if:
@@ -91,10 +96,14 @@ class VizierClient:
             finite Study runs out of suggestions. In such a case, an empty
             list is returned.
     """
+    if client_id_override is not None:
+      client_id = client_id_override
+    else:
+      client_id = self._client_id
     request = vizier_service_pb2.SuggestTrialsRequest(
         parent=resources.StudyResource(self._owner_id, self._study_id).name,
         suggestion_count=suggestion_count,
-        client_id=self._client_id)
+        client_id=client_id)
     future = self._server_stub.SuggestTrials.future(request)
     operation = future.result()
 
@@ -225,6 +234,18 @@ class VizierClient:
         for study in list_studies_response.studies
     ]
 
+  def delete_trial(self, trial_id: int) -> None:
+    """Deletes trial from datastore."""
+    request_trial_name = resources.TrialResource(self._owner_id, self._study_id,
+                                                 trial_id).name
+    request = vizier_service_pb2.DeleteTrialRequest(name=request_trial_name)
+    future = self._server_stub.DeleteStudy.future(request)
+    empty_proto = future.result()
+
+    # Confirms successful execution.
+    assert isinstance(empty_proto, empty_pb2.Empty)
+    logging.info('Trial deleted: %s', trial_id)
+
   def delete_study(self, study_name: Optional[Text] = None) -> None:
     """Deletes study from datastore."""
     if study_name:
@@ -239,6 +260,20 @@ class VizierClient:
     # Confirms successful execution.
     assert isinstance(empty_proto, empty_pb2.Empty)
     logging.info('Study deleted: %s', study_name)
+
+  def get_study_config(
+      self, study_name: Optional[str] = None) -> pyvizier.StudyConfig:
+    """Returns the study config."""
+    if study_name:
+      request_study_name = study_name
+    else:
+      request_study_name = resources.StudyResource(self._owner_id,
+                                                   self._study_id).name
+    request = vizier_service_pb2.GetStudyRequest(name=request_study_name)
+    future = self._server_stub.GetStudy.future(request)
+    response = future.result()
+
+    return pyvizier.StudyConfig.from_proto(response.study_spec)
 
 
 def create_or_load_study(
